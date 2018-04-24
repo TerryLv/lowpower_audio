@@ -45,7 +45,7 @@
 /* Allocate a 5s stero, 22050, record buffer, buffer size should be:
  * 22050 * 2(stero) * 2(S16) * 5 = 441000 Bytes */
 #define AUDIO_REC_DURATION			(5)
-#define AUDIO_REC_SAMPLERATE		(22050)
+#define AUDIO_REC_SAMPLERATE		(48000)
 #define AUDIO_REC_CHANNELS			(2)
 #define AUDIO_REC_BUFFER_SIZE		(AUDIO_REC_SAMPLERATE * AUDIO_REC_CHANNELS * 2 * AUDIO_REC_DURATION)
 
@@ -154,7 +154,7 @@ typedef struct _audio_rpmsg_notification
 	audio_notification_t param;
 } __attribute__((packed)) audio_rpmsg_notification_t;
 
-static __u32 pcm_alloc_cma_buffer(__u32 *data_ptr, __u32 buf_size)
+static __u32 pcm_alloc_cma_buffer(__u32 buf_size)
 {
 	unsigned long long buf_addr_phys = 0;
 
@@ -263,7 +263,7 @@ out:
 	return ret;
 }
 
-int pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
+int pcm_send_to_remote(__u32 data_addr, __u32 data_len)
 {
 	struct rpmsg_endpoint_info eptinfo;
 	audio_rpmsg_request_t audio_msg_req;
@@ -328,7 +328,7 @@ int pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 	audio_msg_req.header.priority = 0;
 	audio_msg_req.param.sampleFormat = SRTM_AUDIO_SERV_SAMPLE_FORMAT_S16_LE;
 	audio_msg_req.param.channels = SRTM_AUDIO_SERV_CHANNEL_STEREO;
-	audio_msg_req.param.sampleRate = 22050;
+	audio_msg_req.param.sampleRate = AUDIO_REC_SAMPLERATE;
 	rtn_bytes = write(rpmsg_ep_fd, &audio_msg_req, sizeof(audio_rpmsg_request_t));
 	if (rtn_bytes != sizeof(audio_rpmsg_request_t)) {
 		fprintf(stderr, "Not all request msg data transmitted or send failed: %ld\n", rtn_bytes);
@@ -357,7 +357,7 @@ int pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 	audio_msg_req.header.type = SRTM_MESSAGE_TYPE_REQUEST;
 	audio_msg_req.header.command = SRTM_AUDIO_SERV_REQUEST_CMD_RX_SET_BUFFER;
 	audio_msg_req.header.priority = 0;
-	audio_msg_req.param.bufferAddress = data_ptr;
+	audio_msg_req.param.bufferAddress = data_addr;
 	audio_msg_req.param.bufferSize = data_len;
 	audio_msg_req.param.periodSize = data_len;
 	audio_msg_req.param.periodOffset = 0;
@@ -409,7 +409,7 @@ int pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 			fprintf(stderr, "Got RX_START response msg! PASS!!\n");
 	}
 
-	pcm_sleep_and_wakeup();
+	//pcm_sleep_and_wakeup();
 
 	/* Read notification */
 	memset(&audio_msg_notif, 0, sizeof(audio_rpmsg_notification_t));
@@ -458,15 +458,16 @@ int main(int argc, char *argv[])
 	__u32 audio_data_phy_addr = 0;
 	__u32 audio_data_len = 0;
 	__u8 *audio_data_ptr = NULL;
-	int ret = 0;
+	int ret = -1;
 
 	/* 1, Allocate cma buffer for record data */
 	fprintf(stdout, "Allocate audio record buffer...");
 	/* Allocate a 5s stero, 22050, record buffer, buffer size should be:
 	 * 22050 * 2(stero) * 2(S16) * 5 = 441000 Bytes */
-	if (!pcm_alloc_cma_buffer(&audio_data_phy_addr, AUDIO_REC_BUFFER_SIZE)) {
+	audio_data_phy_addr = pcm_alloc_cma_buffer(AUDIO_REC_BUFFER_SIZE);
+	if (!audio_data_phy_addr) {
 		fprintf(stderr, "failed!\n");
-		return 1;
+		goto out;
 	}
 	audio_data_len = AUDIO_REC_BUFFER_SIZE;
 	fprintf(stdout, "DONE\n");
@@ -475,7 +476,6 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "Sending PCM audio request to remote processor...");
 	if (pcm_send_to_remote(audio_data_phy_addr, audio_data_len)) {
 		fprintf(stderr, "failed!\n");
-		ret = -1;
 		goto out;
 	}
 	fprintf(stdout, "DONE\n");
@@ -484,7 +484,6 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "Loading recorded PCM audio data to DDR...");
 	if (pcm_load_to_ddr(&audio_data_ptr, audio_data_len)) {
 		fprintf(stderr, "failed!\n");
-		ret = -1;
 		goto out;
 	}
 	fprintf(stdout, "DONE\n");
@@ -493,10 +492,11 @@ int main(int argc, char *argv[])
 	fprintf(stdout, "Saving recorded PCM audio data to file...");
 	if (pcm_save_to_file(audio_data_ptr, audio_data_len)) {
 		fprintf(stderr, "failed!\n");
-		ret = -1;
 		goto out;
 	}
 	fprintf(stdout, "DONE\n");
+
+	ret = 0;
 
 out:
 	/* 6. Clean up*/

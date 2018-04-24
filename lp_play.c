@@ -537,7 +537,6 @@ __s32 pcm_sleep_and_wakeup(void)
 	__s32 ret = 0;
 
 	/* 4, Sleep, zzz~~~ */ 
-	getchar();
 	fprintf(stdout, "Enter suspend mode, zzz~~~\n");
 #if 0
 	if (system("echo mem > /sys/power/state"))
