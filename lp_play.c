@@ -1,7 +1,7 @@
 /*
- * audiovf.c
- * This file is part of audiovf
+ * This file is based on audiovf.c.
  *
+ * Copyright (C) 2018 - Terry Lv
  * Copyright (C) 2016 - Sanchayan Maity
  *
  * audiovf is free software; you can redistribute it and/or modify
