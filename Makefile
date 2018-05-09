@@ -25,8 +25,8 @@ LIBS = -lm
 # Set flags to the compiler and linker
 #CFLAGS += -O2 -g -Wall -DNV_IS_LDK=1 `$(PKG-CONFIG) --cflags glib-2.0 gstreamer-0.10` --sysroot=$(OECORE_TARGET_SYSROOT) $(ARCH_CFLAGS)
 #LDFLAGS += -lpthread `$(PKG-CONFIG) --libs glib-2.0 gstreamer-0.10`
-#CFLAGS += -O2 -g -Wall -DNV_IS_LDK=1 -I$(OECORE_TARGET_SYSROOT)/usr/include/glib-2.0 -I$(OECORE_TARGET_SYSROOT)/usr/lib/glib-2.0/include -I$(OECORE_TARGET_SYSROOT)/usr/include/gstreamer-1.0 --sysroot=$(OECORE_TARGET_SYSROOT) $(ARCH_CFLAGS)
-CFLAGS += -O0 -g -Wall -DNV_IS_LDK=1 -I$(OECORE_TARGET_SYSROOT)/usr/include/glib-2.0 -I$(OECORE_TARGET_SYSROOT)/usr/lib/glib-2.0/include -I$(OECORE_TARGET_SYSROOT)/usr/include/gstreamer-1.0 --sysroot=$(OECORE_TARGET_SYSROOT) $(ARCH_CFLAGS)
+CFLAGS += -O2 -g -Wall -DNV_IS_LDK=1 -I$(OECORE_TARGET_SYSROOT)/usr/include/glib-2.0 -I$(OECORE_TARGET_SYSROOT)/usr/lib/glib-2.0/include -I$(OECORE_TARGET_SYSROOT)/usr/include/gstreamer-1.0 --sysroot=$(OECORE_TARGET_SYSROOT) $(ARCH_CFLAGS)
+#CFLAGS += -O0 -g -Wall -DNV_IS_LDK=1 -I$(OECORE_TARGET_SYSROOT)/usr/include/glib-2.0 -I$(OECORE_TARGET_SYSROOT)/usr/lib/glib-2.0/include -I$(OECORE_TARGET_SYSROOT)/usr/include/gstreamer-1.0 --sysroot=$(OECORE_TARGET_SYSROOT) $(ARCH_CFLAGS)
 LDFLAGS += -lpthread -L$(OECORE_TARGET_SYSROOT)/usr/lib -lglib-2.0 -lgstreamer-1.0 -lgobject-2.0
 
 ##############################################################################

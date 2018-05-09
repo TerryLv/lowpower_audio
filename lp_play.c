@@ -32,6 +32,12 @@
 #include <stdio.h>
 #include <rmtcore_shm.h>
 
+#define PLAY_TIME_CAL
+
+#ifdef PLAY_TIME_CAL
+#include <time.h>
+clock_t time_start_ms = 0, time_end_ms = 0;
+#endif
 
 #define POWER_STATE_DEV				"/sys/power/state"
 #define TMP_FILE_LOCATION			"./audio_play.tmp"
@@ -160,6 +166,7 @@ typedef struct
 	GstElement *pipeline;
 	GstElement *mpeg_audio_parse;	
 	GstElement *beep_dec;
+	GstElement *audio_convert;
 	GstElement *file_sink;
 	GstElement *bin_playback;
 	GstBus *bus;
@@ -169,6 +176,20 @@ typedef struct
 }gstData;
 
 gstData gstreamerData;
+
+#ifdef PLAY_TIME_CAL
+static void time_start()
+{
+	time_start_ms = clock();
+}
+
+static void time_end()
+{
+	time_end_ms = clock();
+	//fprintf(stdout, "Time elapse: %ldms\r\n", (time_end_ms - time_start_ms));
+	fprintf(stdout, "Time elapse: %fs\r\n", (double)(time_end_ms - time_start_ms) / CLOCKS_PER_SEC);
+}
+#endif
 
 /* Create the pipeline element */
 static gboolean gst_create_pipeline(gstData *data)
@@ -220,6 +241,10 @@ static gboolean gst_init_audio_playback_pipeline(gstData *data)
 	if (!data->beep_dec)
 		g_print("\nbeepdec element created failed!");
 	
+	data->audio_convert = gst_element_factory_make("audioconvert", "audioconverter");	
+	if (!data->audio_convert)
+		g_print("\naudioconvert element created failed!");
+
 	data->file_sink = gst_element_factory_make("filesink", "file_sink");
 	if (!data->file_sink)
 		g_print("\nfilesink element created failed!");
@@ -242,7 +267,7 @@ static gboolean gst_init_audio_playback_pipeline(gstData *data)
 	data->bin_playback = gst_bin_new ("bin_playback");	
 	
 	if (strstr(data->file_src_loc, ".mp3")) {
-		gst_bin_add_many(GST_BIN(data->bin_playback), data->file_source, data->mpeg_audio_parse, data->beep_dec, data->file_sink, NULL);
+		gst_bin_add_many(GST_BIN(data->bin_playback), data->file_source, data->mpeg_audio_parse, data->beep_dec, data->audio_convert, data->file_sink, NULL);
 	
 		if (gst_element_link_many (data->file_source, data->mpeg_audio_parse, NULL) != TRUE) {
 			g_printerr("\nFile source and mpeg audio parse element could not link\n");
@@ -253,9 +278,14 @@ static gboolean gst_init_audio_playback_pipeline(gstData *data)
 			g_printerr("\nmpeg audio decoder and beep decoder element could not link\n");
 			return FALSE;
 		}
-	
-		if (gst_element_link_many (data->beep_dec, data->file_sink, NULL) != TRUE) {
-			g_printerr("\nbeep decoder and file sink element could not link\n");
+
+		if (gst_element_link_many (data->beep_dec, data->audio_convert, NULL) != TRUE) {
+			g_printerr("\nbeep decoder and audio converter element could not link\n");
+			return FALSE;
+		}
+
+		if (gst_element_link_many (data->audio_convert, data->file_sink, NULL) != TRUE) {
+			g_printerr("\naudioconvert and file sink element could not link\n");
 			return FALSE;
 		}
 	}
@@ -381,10 +411,14 @@ __s32 gst_generate_pcm(__s32 argc, char *argv[])
 		g_print("Note: Number of bytes for file location: %d\n\n", NUMBER_OF_BYTES_FOR_FILE_LOCATION);
 		return FALSE;
 	}	 
-	
+
+#ifdef PLAY_TIME_CAL
+	time_start();
+#endif
+
 	/* Initialise gstreamer. Mandatory first call before using any other gstreamer functionality */
 	gst_init (&argc, &argv); 
-	
+
 #ifdef GST_USE_BUS_MONITOR
 	/* Create main loop, it will run after calling g_main_loop_run()  */
 	gst_loop = g_main_loop_new(NULL, FALSE);
@@ -448,28 +482,28 @@ static __u32 pcm_write_to_cma_buffer(__u8 *data_ptr, __u32 buf_size)
 	/* Allocate audio buffer */
 	rmtcore_shm_fd = open(RMTCORE_SHM_DEV, O_RDWR);
 	if (rmtcore_shm_fd < 0) {
-		printf("Unable to open device %s\r\n", RMTCORE_SHM_DEV);
+		fprintf(stderr, "Unable to open device %s\r\n", RMTCORE_SHM_DEV);
 		return -1;
 	}
 
 	if (ioctl(rmtcore_shm_fd, RMTCORE_SHM_CHG_BUF_SIZE, &buf_size)) {
-		printf("change mem size failed\r\n");
+		fprintf(stderr, "change mem size failed\r\n");
 		goto out;
 	}
 
 	if (ioctl(rmtcore_shm_fd, RMTCORE_SHM_GET_BUF_ADDR_PHY, &buf_addr_phys)) {
-		printf("read phys mem addr failed\r\n");
+		fprintf(stderr, "read phys mem addr failed\r\n");
 		goto out;
 	}
-	printf("phys address: 0x%llx\r\n", buf_addr_phys);
+	fprintf(stdout, "phys address: 0x%llx\r\n", buf_addr_phys);
 
 	ret = write(rmtcore_shm_fd, data_ptr, buf_size);
 	if (ret != buf_size) {
-		printf("write failed or incompleted!\n");
+		fprintf(stderr, "write failed or incompleted!\n");
 		buf_addr_phys = 0;
 		goto out;
 	} else
-		printf("Finish write audio data to CMA area!\r\n");
+		fprintf(stdout, "Finish write audio data to CMA area!\r\n");
 
 out:
 	return (__u32)buf_addr_phys;
@@ -639,7 +673,7 @@ static __s32 pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_TX_SET_PARAMETER == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got SET_PARAMETER response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got SET_PARAMETER response msg! PASS!!\n");
@@ -671,7 +705,7 @@ static __s32 pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_TX_SET_BUFFER == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got SET_BUFFER response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got SET_BUFFER response msg! PASS!\n");
@@ -699,11 +733,15 @@ static __s32 pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_TX_START == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got TX_START response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got TX_START response msg! PASS!!\n");
 	}
+
+#ifdef PLAY_TIME_CAL
+	time_end();
+#endif
 
 	pcm_sleep_and_wakeup();
 
@@ -740,7 +778,7 @@ static __s32 pcm_send_to_remote(__u32 data_ptr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_TX_CLOSE == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got TX_CLOSE response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got TX_CLOSE response msg! PASS!!\n");

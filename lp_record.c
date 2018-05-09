@@ -158,20 +158,20 @@ static __u32 pcm_alloc_cma_buffer(__u32 buf_size)
 	/* Allocate audio buffer */
 	rmtcore_shm_fd = open(RMTCORE_SHM_DEV, O_RDWR);
 	if (rmtcore_shm_fd < 0) {
-		printf("Unable to open device %s\r\n", RMTCORE_SHM_DEV);
+		fprintf(stderr, "Unable to open device %s\r\n", RMTCORE_SHM_DEV);
 		goto out;
 	}
 
 	if (ioctl(rmtcore_shm_fd, RMTCORE_SHM_CHG_BUF_SIZE, &buf_size)) {
-		printf("change mem size failed\r\n");
+		fprintf(stderr, "change mem size failed\r\n");
 		goto out;
 	}
 
 	if (ioctl(rmtcore_shm_fd, RMTCORE_SHM_GET_BUF_ADDR_PHY, &buf_addr_phys)) {
-		printf("read phys mem addr failed\r\n");
+		fprintf(stderr, "read phys mem addr failed\r\n");
 		goto out;
 	}
-	printf("phys address: 0x%llx\r\n", buf_addr_phys);
+	fprintf(stdout, "phys address: 0x%llx\r\n", buf_addr_phys);
 
 out:
 	return (__u32)buf_addr_phys;
@@ -340,7 +340,7 @@ int pcm_send_to_remote(__u32 data_addr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_RX_SET_PARAMETER == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got SET_PARAMETER response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got SET_PARAMETER response msg! PASS!!\n");
@@ -372,7 +372,7 @@ int pcm_send_to_remote(__u32 data_addr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_RX_SET_BUFFER == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got SET_BUFFER response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got SET_BUFFER response msg! PASS!\n");
@@ -400,7 +400,7 @@ int pcm_send_to_remote(__u32 data_addr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_RX_START == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got RX_START response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got RX_START response msg! PASS!!\n");
@@ -441,7 +441,7 @@ int pcm_send_to_remote(__u32 data_addr, __u32 data_len)
 		return -1;
 	}
 	if (SRTM_AUDIO_SERV_REQUEST_CMD_RX_CLOSE == audio_msg_resp.header.command) {
-		if (audio_msg_resp.param.result[2])
+		if (audio_msg_resp.param.result[1])
 			fprintf(stderr, "Got RX_CLOSE response msg! Failed!\n");
 		else
 			fprintf(stderr, "Got RX_CLOSE response msg! PASS!!\n");
