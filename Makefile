@@ -66,8 +66,8 @@ PROG_PLAY := $(PROG_PLAY)$(BIN_POSTFIX)
 PROG_REC := $(PROG_REC)$(BIN_POSTFIX)
 OBJS_PLAY = $(SRCS_PLAY:.c=$(BIN_POSTFIX).o)
 OBJS_REC = $(SRCS_REC:.c=$(BIN_POSTFIX).o)
-DEPS_PLAY = $(OBJS_PLAY:.o=.o.d)
-DEPS_REC = $(OBJS_REC:.o=.o.d)
+DEPS_PLAY = $(OBJS_PLAY:.o=.d)
+DEPS_REC = $(OBJS_REC:.o=.d)
 
 # pull in dependency info for *existing* .o files
 -include $(DEPS_PLAY) $(DEPS_REC)
